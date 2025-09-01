@@ -37,7 +37,6 @@ func (s *Server) GetOrderByPath(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// сначала кэш
 	if order, ok := s.Cache.Get(orderID); ok {
 		w.Header().Set("Content-Type", "application/json")
 		s.addCORSHeaders(w)
@@ -45,7 +44,6 @@ func (s *Server) GetOrderByPath(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// если в БД
 	order, err := s.DB.GetOrder(orderID)
 	if err != nil {
 		http.Error(w, "Order not found", http.StatusNotFound)
@@ -71,17 +69,14 @@ func (s *Server) addCORSHeaders(w http.ResponseWriter) {
 func (s *Server) Run(addr string) error {
 	r := mux.NewRouter()
 
-	// ✅ Убираем ограничение Methods() → сначала проверим так
 	r.HandleFunc("/order/{order_uid}", s.GetOrderByPath)
 	r.HandleFunc("/", s.Index).Methods("GET")
 
 	fs := http.FileServer(http.Dir("./web"))
 	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", fs))
 
-	// Фронтенд — index.html (SPA fallback)
 	r.PathPrefix("/").HandlerFunc(s.Index)
 
-	// debug всех роутов
 	log.Println("All routes registered:")
 	_ = r.Walk(func(route *mux.Route, router *mux.Router, ancestors []*mux.Route) error {
 		t, _ := route.GetPathTemplate()

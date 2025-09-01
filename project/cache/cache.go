@@ -53,7 +53,6 @@ func (c *Cache) Get(orderUID string) (model.Order, bool) {
 		return model.Order{}, false
 	}
 
-	// Проверяем TTL
 	if time.Since(co.timestamp) > c.ttl {
 		c.mu.Lock()
 		delete(c.orders, orderUID)
