@@ -16,12 +16,12 @@ import (
 )
 
 type Server struct {
-	DB     *database.Database
-	Cache  *cache.Cache
+	DB     database.DB
+	Cache  cache.CC
 	server *http.Server
 }
 
-func NewServer(db *database.Database, c *cache.Cache) *Server {
+func NewServer(db database.DB, c cache.CC) *Server {
 	return &Server{
 		DB:    db,
 		Cache: c,

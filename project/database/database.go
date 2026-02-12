@@ -10,24 +10,25 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+type DB interface {
+	InsertOrder(o model.Order) error
+	GetOrder(id string) (model.Order, error)
+	GetAllOrders() ([]model.Order, error)
+	Close()
+}
+
 type Database struct {
 	Pool *pgxpool.Pool
 }
 
-func NewDB(connection string) (*Database, error) {
+func NewDB(connection string) (DB, error) {
 	pool, err := pgxpool.New(context.Background(), connection)
 	if err != nil {
 		return nil, err
 	}
 	db := &Database{Pool: pool}
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	_, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-
-	_, err = db.Pool.Exec(ctx,
-		"CREATE TABLE IF NOT EXISTS orders (id TEXT PRIMARY KEY, data JSONB NOT NULL)")
-	if err != nil {
-		return nil, err
-	}
 
 	return db, nil
 }
@@ -49,7 +50,7 @@ func (db *Database) InsertOrder(o model.Order) error {
 	defer tx.Rollback(ctx)
 
 	cmdTag, err := tx.Exec(ctx,
-		"INSERT INTO orders (id, data) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+		"INSERT INTO orders (order_uid, data) VALUES ($1, $2) ON CONFLICT DO NOTHING",
 		o.OrderUID, jsonData,
 	)
 	if err != nil {
@@ -68,7 +69,7 @@ func (db *Database) GetOrder(id string) (model.Order, error) {
 
 	var jsonData []byte
 
-	row := db.Pool.QueryRow(ctx, "SELECT data FROM orders WHERE id = $1", id)
+	row := db.Pool.QueryRow(ctx, "SELECT data FROM orders WHERE order_uid = $1", id)
 	if err := row.Scan(&jsonData); err != nil {
 		return model.Order{}, err
 	}

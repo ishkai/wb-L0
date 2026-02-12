@@ -11,10 +11,11 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/segmentio/kafka-go"
 )
 
 func main() {
-	time.Sleep(10 * time.Second)
 	dbConn := os.Getenv("DB_CONN")
 	if dbConn == "" {
 		dbConn = "postgres://manager:qwerty12@postgres:5432/wb_db?sslmode=disable"
@@ -24,12 +25,39 @@ func main() {
 		kafkaBroker = "kafka:9092"
 	}
 
+	kafkaTopic := os.Getenv("KAFKA_TOPIC")
+	if kafkaTopic == "" {
+		kafkaTopic = "orders"
+	}
+
+	kafkaGroup := os.Getenv("KAFKA_GROUP")
+	if kafkaGroup == "" {
+		kafkaGroup = "group"
+	}
+
+	httpAddr := os.Getenv("HTTP_ADDR")
+	if httpAddr == "" {
+		httpAddr = ":8080"
+	}
+
+	dlqTopic := os.Getenv("DLQ_TOPIC")
+	if dlqTopic == "" {
+		dlqTopic = "orders_dlq"
+	}
+
 	db, err := database.NewDB(dbConn)
 	if err != nil {
 		log.Fatalf("Can't connect to database: %v", err)
 
 	}
 	defer db.Close()
+
+	dlqWriter := &kafka.Writer{
+		Addr:     kafka.TCP(kafkaBroker),
+		Topic:    dlqTopic,
+		Balancer: &kafka.LeastBytes{},
+	}
+	defer dlqWriter.Close()
 
 	c := cache.New(5 * time.Minute)
 
@@ -44,12 +72,12 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	cons := consumer.NewConsumer(db, c)
-	go cons.Start(ctx, kafkaBroker, "orders", "group")
+	cons := consumer.NewConsumer(db, c, dlqWriter)
+	go cons.Start(ctx, kafkaBroker, kafkaTopic, kafkaGroup)
 
 	srv := http.NewServer(db, c)
 	go func() {
-		if err := srv.Run(":8080"); err != nil {
+		if err := srv.Run(httpAddr); err != nil {
 			log.Fatalf("Server failed: %v", err)
 		}
 	}()

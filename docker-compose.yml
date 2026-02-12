@@ -27,11 +27,26 @@ services:
     container_name: wb-database
     restart: always
     ports:
-      - "5432:5432"
+      - "5433:5432"
     environment:
       POSTGRES_USER: manager
       POSTGRES_PASSWORD: qwerty12
       POSTGRES_DB: wb_db
+
+  migrate:
+    image: migrate/migrate
+    depends_on:
+      - postgres
+    command: ["up"]
+    volumes:
+      - ./migrations:/migrations
+    entrypoint:
+      [
+        "migrate",
+        "-path", "/migrations",
+        "-database",
+        "postgres://manager:qwerty12@postgres:5432/wb_db?sslmode=disable"
+      ]
 
   app:
     build: .
@@ -39,8 +54,19 @@ services:
     depends_on:
       - postgres
       - kafka
+      - migrate
     ports:
       - "8080:8080"
     environment:
       DB_CONN: "postgres://manager:qwerty12@postgres:5432/wb_db?sslmode=disable"
       KAFKA_BROKER: "kafka:9092"
+
+  generator:
+    build: .
+    container_name: generator
+    depends_on:
+      - kafka
+    command: [ "./generator" ]
+    environment:
+      KAFKA_BROKER: "kafka:9092"
+      KAFKA_TOPIC: "orders"

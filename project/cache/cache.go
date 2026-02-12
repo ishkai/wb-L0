@@ -6,7 +6,12 @@ import (
 	"time"
 )
 
-// Cache saving orders in memory.
+type CC interface {
+	Get(orderUID string) (model.Order, bool)
+	Set(orderUID string, o model.Order)
+	Delete(orderUID string)
+}
+
 type Cache struct {
 	mu     sync.RWMutex
 	orders map[string]cachedOrder
@@ -18,7 +23,6 @@ type cachedOrder struct {
 	timestamp time.Time
 }
 
-// New creating an empty cache.
 func New(ttl time.Duration) *Cache {
 	c := &Cache{
 		orders: make(map[string]cachedOrder),
@@ -43,7 +47,6 @@ func New(ttl time.Duration) *Cache {
 
 }
 
-// Get getting an order with id from cache.
 func (c *Cache) Get(orderUID string) (model.Order, bool) {
 	c.mu.RLock()
 	co, ok := c.orders[orderUID]
@@ -63,7 +66,6 @@ func (c *Cache) Get(orderUID string) (model.Order, bool) {
 	return co.order, true
 }
 
-// Set setting order in cache with id.
 func (c *Cache) Set(orderUID string, o model.Order) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -73,7 +75,6 @@ func (c *Cache) Set(orderUID string, o model.Order) {
 	}
 }
 
-// Delete deleting an order from cache.
 func (c *Cache) Delete(orderUID string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

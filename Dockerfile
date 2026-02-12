@@ -7,13 +7,15 @@ RUN go mod download
 
 COPY . .
 
-RUN go build -o main .
-
+RUN go build -o main ./cmd/app
+RUN go build -o generator ./cmd/generator
 FROM alpine:latest
 
 WORKDIR /app
 
 COPY --from=builder /app/main .
+COPY --from=builder /app/web ./web
+COPY --from=builder /app/generator .
 
 
 CMD ["./main"]
